@@ -541,23 +541,6 @@ class FacebookAdsApiBatch(object):
             return None
 
 
-class EnhancedFacebookResponse(FacebookResponse):
-    def __init__(self, response, parsed_data=None):
-        # 원본 응답 객체의 모든 속성을 복사
-        for attr in dir(response):
-            if not attr.startswith("_"):  # private 속성 제외
-                setattr(self, attr, getattr(response, attr))
-
-        self._parsed_data = parsed_data
-
-    @property
-    def headers(self):
-        return self.headers()  # FacebookResponse의 headers() 메서드 사용
-
-    def json(self):
-        return self._parsed_data if self._parsed_data is not None else super().json()
-
-
 class FacebookRequest:
     """
     Represents an API request
@@ -691,10 +674,8 @@ class FacebookRequest:
             )
             cursor.load_next_page()
             return cursor
-
         if self._fields:
             params["fields"] = ",".join(self._fields)
-
         with open_files(self._file_params) as files:
             response = self._api.call(
                 method=self._method,
@@ -703,15 +684,15 @@ class FacebookRequest:
                 files=files,
                 api_version=self._api_version,
             )
-
             if response.error():
                 raise response.error()
-
             if self._response_parser:
+                headers = response.headers()
                 parsed_data = self._response_parser.parse_single(response.json())
-                return EnhancedFacebookResponse(response, parsed_data)
+                parsed_data.headers = lambda: headers
+                return parsed_data
             else:
-                return EnhancedFacebookResponse(response)
+                return response
 
     def add_to_batch(self, batch, success=None, failure=None):
         batch.add_request(self, success, failure)

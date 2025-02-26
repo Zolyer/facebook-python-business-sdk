@@ -18,6 +18,7 @@ from facebook_business.adobjects.objectparser import ObjectParser
 
 import logging
 
+
 class AbstractCrudObject(AbstractObject):
     """
     Extends AbstractObject and implements methods to create, read, update,
@@ -40,12 +41,13 @@ class AbstractCrudObject(AbstractObject):
 
         self._api = api or FacebookAdsApi.get_default_api()
         self._changes = {}
-        if (parent_id is not None):
-            warning_message = "parent_id as a parameter of constructor is " \
-                  "being deprecated."
+        if parent_id is not None:
+            warning_message = (
+                "parent_id as a parameter of constructor is being deprecated."
+            )
             logging.warning(warning_message)
         self._parent_id = parent_id
-        self._data['id'] = fbid
+        self._data["id"] = fbid
         self._include_summary = True
 
     def __setitem__(self, key, value):
@@ -54,7 +56,7 @@ class AbstractCrudObject(AbstractObject):
         if key not in self._data or self._data[key] != value:
             self._changes[key] = value
         super(AbstractCrudObject, self).__setitem__(key, value)
-        if '_setitem_trigger' in dir(self):
+        if "_setitem_trigger" in dir(self):
             self._setitem_trigger(key, value)
 
         return self
@@ -67,11 +69,12 @@ class AbstractCrudObject(AbstractObject):
         """Two objects are the same if they have the same fbid."""
         return (
             # Same class
-            isinstance(other, self.__class__) and
-
+            isinstance(other, self.__class__)
+            and
             # Both have id's
-            self.get_id() and other.get_id() and
-
+            self.get_id()
+            and other.get_id()
+            and
             # Both have same id
             self.get_id() == other.get_id()
         )
@@ -84,10 +87,10 @@ class AbstractCrudObject(AbstractObject):
         api = api or FacebookAdsApi.get_default_api()
         params = dict(params or {})
         cls._assign_fields_to_params(fields, params)
-        params['ids'] = ','.join(map(str, ids))
+        params["ids"] = ",".join(map(str, ids))
         response = api.call(
-            'GET',
-            ['/'],
+            "GET",
+            ["/"],
             params=params,
         )
         result = []
@@ -101,7 +104,11 @@ class AbstractCrudObject(AbstractObject):
 
     def get_id(self):
         """Returns the object's fbid if set. Else, it returns None."""
-        return self[self.Field.id] if hasattr(self, 'Field') and hasattr(self.Field, 'Field') else self['id']
+        return (
+            self[self.Field.id]
+            if hasattr(self, "Field") and hasattr(self.Field, "Field")
+            else self["id"]
+        )
 
     # @deprecated deprecate parent_id in AbstractCrudObject
     def get_parent_id(self):
@@ -123,8 +130,7 @@ class AbstractCrudObject(AbstractObject):
         """
         if not self.get(self.Field.id):
             raise FacebookBadObjectError(
-                "%s object needs an id for this operation."
-                % self.__class__.__name__,
+                "%s object needs an id for this operation." % self.__class__.__name__,
             )
 
         return self.get_id()
@@ -165,8 +171,8 @@ class AbstractCrudObject(AbstractObject):
 
     def _clear_history(self):
         self._changes = {}
-        if 'filename' in self._data:
-            del self._data['filename']
+        if "filename" in self._data:
+            del self._data["filename"]
         return self
 
     def _set_data(self, data):
@@ -208,7 +214,7 @@ class AbstractCrudObject(AbstractObject):
 
     def get_node_path_string(self):
         """Returns the node's path as a tuple."""
-        return '/'.join(self.get_node_path())
+        return "/".join(self.get_node_path())
 
     # CRUD
     # @deprecated
@@ -243,28 +249,26 @@ class AbstractCrudObject(AbstractObject):
         logging.warning(warning_message)
         if self.get_id():
             raise FacebookBadObjectError(
-                "This %s object was already created."
-                % self.__class__.__name__,
+                "This %s object was already created." % self.__class__.__name__,
             )
-        if not 'get_endpoint' in dir(self):
-            raise TypeError('Cannot create object of type %s.'
-                            % self.__class__.__name__)
+        if "get_endpoint" not in dir(self):
+            raise TypeError(
+                "Cannot create object of type %s." % self.__class__.__name__
+            )
 
         params = {} if not params else params.copy()
         params.update(self.export_all_data())
         request = None
-        if hasattr(self, 'api_create'):
+        if hasattr(self, "api_create"):
             request = self.api_create(self.get_parent_id_assured(), pending=True)
         else:
             request = FacebookRequest(
                 node_id=self.get_parent_id_assured(),
-                method='POST',
+                method="POST",
                 endpoint=self.get_endpoint(),
                 api=self._api,
                 target_class=self.__class__,
-                response_parser=ObjectParser(
-                    reuse_object=self
-                ),
+                response_parser=ObjectParser(reuse_object=self),
             )
         request.add_params(params)
         request.add_files(files)
@@ -291,6 +295,8 @@ class AbstractCrudObject(AbstractObject):
             response = request.execute()
             self._set_data(response._json)
             self._clear_history()
+
+            self.headers = lambda: response.headers
 
             return self
 
@@ -326,23 +332,22 @@ class AbstractCrudObject(AbstractObject):
         warning_message = "`remote_read` is being deprecated, please update your code with new function."
         logging.warning(warning_message)
         params = dict(params or {})
-        if hasattr(self, 'api_get'):
+        if hasattr(self, "api_get"):
             request = self.api_get(pending=True)
         else:
             request = FacebookRequest(
                 node_id=self.get_id_assured(),
-                method='GET',
-                endpoint='/',
+                method="GET",
+                endpoint="/",
                 api=self._api,
                 target_class=self.__class__,
-                response_parser=ObjectParser(
-                    reuse_object=self
-                ),
+                response_parser=ObjectParser(reuse_object=self),
             )
         request.add_params(params)
         request.add_fields(fields)
 
         if batch is not None:
+
             def callback_success(response):
                 self._set_data(response.json())
 
@@ -396,23 +401,22 @@ class AbstractCrudObject(AbstractObject):
         params = {} if not params else params.copy()
         params.update(self.export_changed_data())
         self._set_data(params)
-        if hasattr(self, 'api_update'):
+        if hasattr(self, "api_update"):
             request = self.api_update(pending=True)
         else:
             request = FacebookRequest(
                 node_id=self.get_id_assured(),
-                method='POST',
-                endpoint='/',
+                method="POST",
+                endpoint="/",
                 api=self._api,
                 target_class=self.__class__,
-                response_parser=ObjectParser(
-                    reuse_object=self
-                ),
+                response_parser=ObjectParser(reuse_object=self),
             )
         request.add_params(params)
         request.add_files(files)
 
         if batch is not None:
+
             def callback_success(response):
                 self._clear_history()
 
@@ -462,17 +466,18 @@ class AbstractCrudObject(AbstractObject):
         """
         warning_message = "`remote_delete` is being deprecated, please update your code with new function."
         logging.warning(warning_message)
-        if hasattr(self, 'api_delete'):
+        if hasattr(self, "api_delete"):
             request = self.api_delete(pending=True)
         else:
             request = FacebookRequest(
                 node_id=self.get_id_assured(),
-                method='DELETE',
-                endpoint='/',
+                method="DELETE",
+                endpoint="/",
                 api=self._api,
             )
         request.add_params(params)
         if batch is not None:
+
             def callback_success(response):
                 self.clear_id()
 
@@ -510,18 +515,14 @@ class AbstractCrudObject(AbstractObject):
         else:
             return self.remote_create(*args, **kwargs)
 
-    def remote_archive(
-        self,
-        batch=None,
-        failure=None,
-        success=None
-    ):
-        if 'Status' not in dir(self) or 'archived' not in dir(self.Status):
-            raise TypeError('Cannot archive object of type %s.'
-                            % self.__class__.__name__)
+    def remote_archive(self, batch=None, failure=None, success=None):
+        if "Status" not in dir(self) or "archived" not in dir(self.Status):
+            raise TypeError(
+                "Cannot archive object of type %s." % self.__class__.__name__
+            )
         return self.api_create(
             params={
-                'status': self.Status.archived,
+                "status": self.Status.archived,
             },
             batch=batch,
             failure=failure,
@@ -538,7 +539,7 @@ class AbstractCrudObject(AbstractObject):
         params=None,
         fetch_first_page=True,
         include_summary=True,
-        endpoint=None
+        endpoint=None,
     ):
         """
         Returns Cursor with argument self as source_object and
@@ -558,10 +559,17 @@ class AbstractCrudObject(AbstractObject):
             cursor.load_next_page()
         return cursor
 
-    def iterate_edge_async(self, target_objects_class, fields=None,
-                           params=None, is_async=False, include_summary=True,
-                           endpoint=None):
+    def iterate_edge_async(
+        self,
+        target_objects_class,
+        fields=None,
+        params=None,
+        is_async=False,
+        include_summary=True,
+        endpoint=None,
+    ):
         from facebook_business.adobjects.adreportrun import AdReportRun
+
         """
         Behaves as iterate_edge(...) if parameter is_async if False
         (Default value)
@@ -600,28 +608,34 @@ class AbstractCrudObject(AbstractObject):
         # indicates the progress of the async request.
         if endpoint is None:
             endpoint = target_objects_class.get_endpoint()
-        response = self.get_api_assured().call(
-            'POST',
-            (self.get_id_assured(), endpoint),
-            params=params,
-        ).json()
+        response = (
+            self.get_api_assured()
+            .call(
+                "POST",
+                (self.get_id_assured(), endpoint),
+                params=params,
+            )
+            .json()
+        )
 
         # AsyncJob stores the real iterator
         # for when the result is ready to be queried
         result = AdReportRun()
 
-        if 'report_run_id' in response:
-            response['id'] = response['report_run_id']
+        if "report_run_id" in response:
+            response["id"] = response["report_run_id"]
         result._set_data(response)
         return result
 
-    def edge_object(self, target_objects_class, fields=None, params=None, endpoint=None):
+    def edge_object(
+        self, target_objects_class, fields=None, params=None, endpoint=None
+    ):
         """
         Returns first object when iterating over Cursor with argument
         self as source_object and the rest as given __init__ arguments.
         """
         params = {} if not params else params.copy()
-        params['limit'] = '1'
+        params["limit"] = "1"
         for obj in self.iterate_edge(
             target_objects_class,
             fields=fields,
@@ -635,5 +649,4 @@ class AbstractCrudObject(AbstractObject):
 
     def assure_call(self):
         if not self._api:
-            raise FacebookBadObjectError(
-                'Api call cannot be made if api is not set')
+            raise FacebookBadObjectError("Api call cannot be made if api is not set")
