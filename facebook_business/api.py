@@ -25,11 +25,11 @@ import six
 import re
 
 try:
-  # Since python 3
-  from six.moves import collections_abc
+    # Since python 3
+    from six.moves import collections_abc
 except ImportError:
-  # Won't work after python 3.8
-  import collections as collections_abc
+    # Won't work after python 3.8
+    import collections as collections_abc
 
 from facebook_business.adobjects.objectparser import ObjectParser
 from facebook_business.typechecker import TypeChecker
@@ -40,8 +40,24 @@ api module contains classes that make http requests to Facebook's graph API.
 """
 
 
-class FacebookResponse(object):
+class EnhancedFacebookResponse:
+    def __init__(self, response, parsed_data=None):
+        self._fb_response = response
+        self._parsed_data = parsed_data
 
+    @property
+    def headers(self):
+        return self._fb_response.headers()
+
+    @property
+    def data(self):
+        return self._parsed_data or self._fb_response
+
+    def __getattr__(self, name):
+        return getattr(self._fb_response, name)
+
+
+class FacebookResponse(object):
     """Encapsulates an http response from Facebook's Graph API."""
 
     def __init__(self, body=None, http_status=None, headers=None, call=None):
@@ -74,7 +90,7 @@ class FacebookResponse(object):
 
     def etag(self):
         """Returns the ETag header value if it exists."""
-        return self._headers.get('ETag')
+        return self._headers.get("ETag")
 
     def status(self):
         """Returns the http status code of the response."""
@@ -85,15 +101,15 @@ class FacebookResponse(object):
 
         json_body = self.json()
 
-        if isinstance(json_body, collections_abc.Mapping) and 'error' in json_body:
+        if isinstance(json_body, collections_abc.Mapping) and "error" in json_body:
             # Is a dictionary, has error in it
             return False
         elif bool(json_body):
             # Has body and no error
-            if 'success' in json_body:
-                return json_body['success']
+            if "success" in json_body:
+                return json_body["success"]
             # API can return a success 200 when service unavailable occurs
-            return 'Service Unavailable' not in json_body
+            return "Service Unavailable" not in json_body
         elif self._http_status == http_client.NOT_MODIFIED:
             # ETAG Hit
             return True
@@ -126,7 +142,6 @@ class FacebookResponse(object):
 
 
 class FacebookAdsApi(object):
-
     """Encapsulates session attributes and methods to make API calls.
     Attributes:
         SDK_VERSION (class): indicating sdk version.
@@ -137,18 +152,18 @@ class FacebookAdsApi(object):
             this sdk.
     """
 
-    SDK_VERSION = apiconfig.ads_api_config['SDK_VERSION']
+    SDK_VERSION = apiconfig.ads_api_config["SDK_VERSION"]
 
-    API_VERSION = apiconfig.ads_api_config['API_VERSION']
+    API_VERSION = apiconfig.ads_api_config["API_VERSION"]
 
-    HTTP_METHOD_GET = 'GET'
+    HTTP_METHOD_GET = "GET"
 
-    HTTP_METHOD_POST = 'POST'
+    HTTP_METHOD_POST = "POST"
 
-    HTTP_METHOD_DELETE = 'DELETE'
+    HTTP_METHOD_DELETE = "DELETE"
 
     HTTP_DEFAULT_HEADERS = {
-        'User-Agent': "fbbizsdk-python-%s" % SDK_VERSION,
+        "User-Agent": "fbbizsdk-python-%s" % SDK_VERSION,
     }
 
     _default_api = None
@@ -188,8 +203,7 @@ class FacebookAdsApi(object):
         debug=False,
         crash_log=True,
     ):
-        session = FacebookSession(app_id, app_secret, access_token, proxies,
-                                  timeout)
+        session = FacebookSession(app_id, app_secret, access_token, proxies, timeout)
         api = cls(session, api_version, enable_debug_logger=debug)
         cls.set_default_api(api)
 
@@ -198,6 +212,7 @@ class FacebookAdsApi(object):
 
         if crash_log:
             from facebook_business.crashreporter import CrashReporter
+
             if debug:
                 CrashReporter.enableLogging()
             CrashReporter.enable()
@@ -222,7 +237,7 @@ class FacebookAdsApi(object):
     @classmethod
     def set_default_account_id(cls, account_id):
         account_id = str(account_id)
-        if account_id.find('act_') == -1:
+        if account_id.find("act_") == -1:
             raise ValueError(
                 "Account ID provided in FacebookAdsApi.set_default_account_id "
                 "expects a string that begins with 'act_'",
@@ -273,9 +288,9 @@ class FacebookAdsApi(object):
 
         api_version = api_version or self._api_version
 
-        if api_version and not re.search(r'v[0-9]+\.[0-9]+', api_version):
+        if api_version and not re.search(r"v[0-9]+\.[0-9]+", api_version):
             raise FacebookBadObjectError(
-                'Please provide the API version in the following format: %s'
+                "Please provide the API version in the following format: %s"
                 % self.API_VERSION,
             )
 
@@ -283,11 +298,13 @@ class FacebookAdsApi(object):
 
         if not isinstance(path, six.string_types):
             # Path is not a full path
-            path = "/".join((
-                url_override or self._session.GRAPH,
-                api_version,
-                '/'.join(map(str, path)),
-            ))
+            path = "/".join(
+                (
+                    url_override or self._session.GRAPH,
+                    api_version,
+                    "/".join(map(str, path)),
+                )
+            )
 
         # Include api headers in http request
         headers = headers.copy()
@@ -297,14 +314,14 @@ class FacebookAdsApi(object):
             params = _top_level_param_json_encode(params)
 
         # Get request response and encapsulate it in a FacebookResponse
-        if method in ('GET', 'DELETE'):
+        if method in ("GET", "DELETE"):
             response = self._session.requests.request(
                 method,
                 path,
                 params=params,
                 headers=headers,
                 files=files,
-                timeout=self._session.timeout
+                timeout=self._session.timeout,
             )
 
         else:
@@ -314,21 +331,22 @@ class FacebookAdsApi(object):
                 data=params,
                 headers=headers,
                 files=files,
-                timeout=self._session.timeout
+                timeout=self._session.timeout,
             )
         if self._enable_debug_logger:
             import curlify
+
             print(curlify.to_curl(response.request))
         fb_response = FacebookResponse(
             body=response.text,
             headers=response.headers,
             http_status=response.status_code,
             call={
-                'method': method,
-                'path': path,
-                'params': params,
-                'headers': headers,
-                'files': files,
+                "method": method,
+                "path": path,
+                "params": params,
+                "headers": headers,
+                "files": files,
             },
         )
 
@@ -347,7 +365,6 @@ class FacebookAdsApi(object):
 
 
 class FacebookAdsApiBatch(object):
-
     """
     Exposes methods to build a sequence of calls which can be executed with
     a single http request.
@@ -406,34 +423,36 @@ class FacebookAdsApiBatch(object):
             A dictionary describing the call.
         """
         if not isinstance(relative_path, six.string_types):
-            relative_url = '/'.join(relative_path)
+            relative_url = "/".join(relative_path)
         else:
             relative_url = relative_path
 
         call = {
-            'method': method,
-            'relative_url': relative_url,
+            "method": method,
+            "relative_url": relative_url,
         }
 
         if params:
             params = _top_level_param_json_encode(params)
-            keyvals = ['%s=%s' % (key, urls.quote_with_encoding(value))
-                       for key, value in params.items()]
-            if method == 'GET':
-                call['relative_url'] += '?' + '&'.join(keyvals)
+            keyvals = [
+                "%s=%s" % (key, urls.quote_with_encoding(value))
+                for key, value in params.items()
+            ]
+            if method == "GET":
+                call["relative_url"] += "?" + "&".join(keyvals)
             else:
-                call['body'] = '&'.join(keyvals)
+                call["body"] = "&".join(keyvals)
 
         if files:
-            call['attached_files'] = ','.join(files.keys())
+            call["attached_files"] = ",".join(files.keys())
 
         if headers:
-            call['headers'] = []
+            call["headers"] = []
             for header in headers:
                 batch_formatted_header = {}
-                batch_formatted_header['name'] = header
-                batch_formatted_header['value'] = headers[header]
-                call['headers'].append(batch_formatted_header)
+                batch_formatted_header["name"] = header
+                batch_formatted_header["value"] = headers[header]
+                call["headers"].append(batch_formatted_header)
 
         self._batch.append(call)
         self._files.append(files)
@@ -461,7 +480,7 @@ class FacebookAdsApiBatch(object):
         """
         updated_params = copy.deepcopy(request._params)
         if request._fields:
-            updated_params['fields'] = ','.join(request._fields)
+            updated_params["fields"] = ",".join(request._fields)
         return self.add(
             method=request._method,
             relative_path=request._path,
@@ -485,9 +504,9 @@ class FacebookAdsApiBatch(object):
         """
         if not self._batch:
             return None
-        method = 'POST'
+        method = "POST"
         path = tuple()
-        params = {'batch': self._batch}
+        params = {"batch": self._batch}
         files = {}
         for call_files in self._files:
             if call_files:
@@ -505,9 +524,9 @@ class FacebookAdsApiBatch(object):
 
         for index, response in enumerate(responses):
             if response:
-                body = response.get('body')
-                code = response.get('code')
-                headers = response.get('headers')
+                body = response.get("body")
+                code = response.get("code")
+                headers = response.get("headers")
 
                 inner_fb_response = FacebookResponse(
                     body=body,
@@ -528,10 +547,12 @@ class FacebookAdsApiBatch(object):
             new_batch = self.__class__(self._api)
             new_batch._files = [self._files[index] for index in retry_indices]
             new_batch._batch = [self._batch[index] for index in retry_indices]
-            new_batch._success_callbacks = [self._success_callbacks[index]
-                                            for index in retry_indices]
-            new_batch._failure_callbacks = [self._failure_callbacks[index]
-                                            for index in retry_indices]
+            new_batch._success_callbacks = [
+                self._success_callbacks[index] for index in retry_indices
+            ]
+            new_batch._failure_callbacks = [
+                self._failure_callbacks[index] for index in retry_indices
+            ]
             return new_batch
         else:
             return None
@@ -573,8 +594,8 @@ class FacebookRequest:
         self._api = api or FacebookAdsApi.get_default_api()
         self._node_id = node_id
         self._method = method
-        self._endpoint = endpoint.replace('/', '')
-        self._path = (node_id, endpoint.replace('/', ''))
+        self._endpoint = endpoint.replace("/", "")
+        self._path = (node_id, endpoint.replace("/", ""))
         self._param_checker = param_checker
         self._target_class = target_class
         self._api_type = api_type
@@ -592,14 +613,14 @@ class FacebookRequest:
 
     def add_file(self, file_path):
         if not self._allow_file_upload:
-            api_utils.warning('Endpoint ' + self._endpoint + ' cannot upload files')
-        file_key = 'source' + str(self._file_counter)
+            api_utils.warning("Endpoint " + self._endpoint + " cannot upload files")
+        file_key = "source" + str(self._file_counter)
         if os.path.isfile(file_path):
             self._file_params[file_key] = file_path
             self._file_counter += 1
         else:
             raise FacebookBadParameterError(
-                'Cannot find file ' + file_path + '!',
+                "Cannot find file " + file_path + "!",
             )
         return self
 
@@ -614,7 +635,7 @@ class FacebookRequest:
         if field not in self._fields:
             self._fields.append(field)
         if field not in self._accepted_fields:
-            api_utils.warning(self._endpoint + ' does not allow field ' + field)
+            api_utils.warning(self._endpoint + " does not allow field " + field)
         return self
 
     def add_fields(self, fields):
@@ -626,9 +647,16 @@ class FacebookRequest:
 
     def add_param(self, key, value):
         if not self._param_checker.is_valid_pair(key, value):
-            api_utils.warning('value of ' + key + ' might not be compatible. ' +
-                ' Expect ' + self._param_checker.get_type(key) + '; ' +
-                ' got ' + str(type(value)))
+            api_utils.warning(
+                "value of "
+                + key
+                + " might not be compatible. "
+                + " Expect "
+                + self._param_checker.get_type(key)
+                + "; "
+                + " got "
+                + str(type(value))
+            )
         if self._param_checker.is_file_param(key):
             self._file_params[key] = value
         else:
@@ -663,8 +691,10 @@ class FacebookRequest:
             )
             cursor.load_next_page()
             return cursor
+
         if self._fields:
-            params['fields'] = ','.join(self._fields)
+            params["fields"] = ",".join(self._fields)
+
         with open_files(self._file_params) as files:
             response = self._api.call(
                 method=self._method,
@@ -673,30 +703,34 @@ class FacebookRequest:
                 files=files,
                 api_version=self._api_version,
             )
+
             if response.error():
                 raise response.error()
+
             if self._response_parser:
-                return self._response_parser.parse_single(response.json())
+                parsed_data = self._response_parser.parse_single(response.json())
+                return EnhancedFacebookResponse(response, parsed_data)
             else:
-                return response
+                return EnhancedFacebookResponse(response)
 
     def add_to_batch(self, batch, success=None, failure=None):
         batch.add_request(self, success, failure)
 
     def _extract_value(self, value):
-        if hasattr(value, 'export_all_data'):
+        if hasattr(value, "export_all_data"):
             return value.export_all_data()
         elif isinstance(value, list):
             return [self._extract_value(item) for item in value]
         elif isinstance(value, dict):
-            return dict((self._extract_value(k), self._extract_value(v))
-                for (k, v) in value.items())
+            return dict(
+                (self._extract_value(k), self._extract_value(v))
+                for (k, v) in value.items()
+            )
         else:
             return value
 
 
 class Cursor(object):
-
     """Cursor is an cursor over an object's connections.
         Previously called EdgeIterator.
     Examples:
@@ -716,7 +750,7 @@ class Cursor(object):
         api=None,
         node_id=None,
         endpoint=None,
-        object_parser=None
+        object_parser=None,
     ):
         """
         Initializes an cursor over the objects to which there is an edge from
@@ -755,7 +789,7 @@ class Cursor(object):
         self._finished_iteration = False
         self._total_count = None
         self._summary = None
-        self._include_summary = include_summary or 'default_summary' in self.params
+        self._include_summary = include_summary or "default_summary" in self.params
         self._object_parser = object_parser or ObjectParser(
             api=self._api,
             target_class=self._target_objects_class,
@@ -790,23 +824,21 @@ class Cursor(object):
     def total(self):
         if self._total_count is None:
             raise FacebookUnavailablePropertyException(
-                "Couldn't retrieve the object total count for that type "
-                "of request.",
+                "Couldn't retrieve the object total count for that type of request.",
             )
         return self._total_count
 
     def summary(self):
         if self._summary is None or not isinstance(self._summary, dict):
             raise FacebookUnavailablePropertyException(
-                "Couldn't retrieve the object summary for that type "
-                "of request.",
+                "Couldn't retrieve the object summary for that type of request.",
             )
         return "<Summary> %s" % (
             json.dumps(
                 self._summary,
                 sort_keys=True,
                 indent=4,
-                separators=(',', ': '),
+                separators=(",", ": "),
             ),
         )
 
@@ -819,14 +851,14 @@ class Cursor(object):
             return False
 
         if (
-            self._include_summary and
-            'default_summary' not in self.params and
-            'summary' not in self.params
+            self._include_summary
+            and "default_summary" not in self.params
+            and "summary" not in self.params
         ):
-            self.params['summary'] = True
+            self.params["summary"] = True
 
         response_obj = self._api.call(
-            'GET',
+            "GET",
             self._path,
             params=self.params,
         )
@@ -834,26 +866,27 @@ class Cursor(object):
         self._headers = response_obj.headers()
 
         if (
-            'paging' in response and
-            'cursors' in response['paging'] and
-            'after' in response['paging']['cursors'] and
+            "paging" in response
+            and "cursors" in response["paging"]
+            and "after" in response["paging"]["cursors"]
+            and
             # 'after' will always exist even if no more pages are available
-            'next' in response['paging']
+            "next" in response["paging"]
         ):
-            self.params['after'] = response['paging']['cursors']['after']
+            self.params["after"] = response["paging"]["cursors"]["after"]
         else:
             # Indicate if this was the last page
             self._finished_iteration = True
 
         if (
-            self._include_summary and
-            'summary' in response and
-            'total_count' in response['summary']
+            self._include_summary
+            and "summary" in response
+            and "total_count" in response["summary"]
         ):
-            self._total_count = response['summary']['total_count']
+            self._total_count = response["summary"]["total_count"]
 
-        if self._include_summary and 'summary' in response:
-            self._summary = response['summary']
+        if self._include_summary and "summary" in response:
+            self._summary = response["summary"]
 
         self._queue = self.build_objects_from_response(response)
         return len(self._queue) > 0
@@ -871,7 +904,7 @@ class Cursor(object):
 def open_files(files):
     opened_files = {}
     for key, path in files.items():
-        opened_files.update({key: open(path, 'rb')})
+        opened_files.update({key: open(path, "rb")})
     yield opened_files
     for file in opened_files.values():
         file.close()
@@ -881,14 +914,13 @@ def _top_level_param_json_encode(params):
     params = params.copy()
 
     for param, value in params.items():
-        if (
-            isinstance(value, (collections_abc.Mapping, collections_abc.Sequence, bool))
-            and not isinstance(value, six.string_types)
-        ):
+        if isinstance(
+            value, (collections_abc.Mapping, collections_abc.Sequence, bool)
+        ) and not isinstance(value, six.string_types):
             params[param] = json.dumps(
                 value,
                 sort_keys=True,
-                separators=(',', ':'),
+                separators=(",", ":"),
             )
         else:
             params[param] = value
