@@ -40,23 +40,6 @@ api module contains classes that make http requests to Facebook's graph API.
 """
 
 
-class EnhancedFacebookResponse:
-    def __init__(self, response, parsed_data=None):
-        self._fb_response = response
-        self._parsed_data = parsed_data
-
-    @property
-    def headers(self):
-        return self._fb_response.headers()
-
-    @property
-    def data(self):
-        return self._parsed_data or self._fb_response
-
-    def __getattr__(self, name):
-        return getattr(self._fb_response, name)
-
-
 class FacebookResponse(object):
     """Encapsulates an http response from Facebook's Graph API."""
 
@@ -556,6 +539,23 @@ class FacebookAdsApiBatch(object):
             return new_batch
         else:
             return None
+
+
+class EnhancedFacebookResponse(FacebookResponse):
+    def __init__(self, response, parsed_data=None):
+        # 원본 응답 객체의 모든 속성을 복사
+        for attr in dir(response):
+            if not attr.startswith("_"):  # private 속성 제외
+                setattr(self, attr, getattr(response, attr))
+
+        self._parsed_data = parsed_data
+
+    @property
+    def headers(self):
+        return self.headers()  # FacebookResponse의 headers() 메서드 사용
+
+    def json(self):
+        return self._parsed_data if self._parsed_data is not None else super().json()
 
 
 class FacebookRequest:
