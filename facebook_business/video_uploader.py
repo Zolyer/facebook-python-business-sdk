@@ -360,7 +360,7 @@ class VideoUploadRequest(object):
             path,
             params=self._params,
             files=self._files,
-            url_override='https://graph-video.facebook.com',
+            url_override='https://graph.facebook.com',
         )
 
     def setParams(self, params, files=None):
